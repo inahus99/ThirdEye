@@ -78,7 +78,7 @@ process.on("uncaughtException", (err) => {
   // --- API routes (mount AFTER CORS) ---
   app.use("/api/analytics", analyticsRouter);
   app.use("/api/websites", websitesRouter);
-
+app.use('/api/traffic-lite', require('./routes/trafficLite'));
   app.use("/api", cronRouter);
   app.use("/api/incidents", require("./routes/incidents"));
   // health + root …
