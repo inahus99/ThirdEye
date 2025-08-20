@@ -8,7 +8,7 @@ build/
 .cache/
 coverage/
 .DS_Store
-
+.parcel-cache
 # Env & local secrets
 .env
 .env.*.local
