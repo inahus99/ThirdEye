@@ -61,7 +61,7 @@ export default function Contact() {
 
   /* ---------- helpers ---------- */
   const supportEmail = "support@third-eye.work";
-  const githubUrl = "https://github.com/your-repo";
+  const githubUrl = "https://github.com/inahus99/ThirdEye";
   const { hasCopied, onCopy } = useClipboard(supportEmail);
 
   const mailtoHref = useMemo(() => {

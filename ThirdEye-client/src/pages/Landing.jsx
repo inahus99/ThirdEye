@@ -452,7 +452,7 @@ export default function Landing() {
             © {new Date().getFullYear()} Third Eye — Crafted by{" "}
             <ChakraLink
               isExternal
-              href="https://github.com/SuhaniTyagi"
+              href="https://github.com/inahus99/ThirdEye"
               color="blue.300"
               fontWeight="600"
               _hover={{ textDecoration: "underline" }}
