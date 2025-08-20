@@ -269,7 +269,7 @@ export default function Landing() {
               </GlowButton>
               <GlowButton
                 onClick={() =>
-                  window.open("https://github.com/SuhaniTyagi", "_blank")
+                  window.open("https://github.com/inahus99/ThirdEye", "_blank")
                 }
                 variant="outline"
                 borderColor="whiteAlpha.300"
