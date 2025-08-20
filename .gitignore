@@ -1,0 +1,36 @@
+# Node / general
+node_modules/
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+dist/
+build/
+.cache/
+coverage/
+.DS_Store
+
+# Env & local secrets
+.env
+.env.*.local
+*.local.env
+**/.env
+**/.env.local
+.envrc
+
+# Logs & tmp
+logs/
+*.log
+tmp/
+.pnpm-store/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Next/Vercel
+.vercel/
+.next/
+
+# Misc
+*.pid
