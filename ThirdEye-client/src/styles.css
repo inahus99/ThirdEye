@@ -1,0 +1,171 @@
+.legacy-ui {
+  /* theme tokens (optional) */
+  --bg: #0f1115;
+  --panel: #171923;
+  --panel-2: #1e2130;
+  --border: #2a2e3f;
+  --text: #e6e7ee;
+  --muted: #9aa3b2;
+  --blue: #3b82f6;
+  --blue-2: #2563eb;
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+}
+
+/* layout helpers (scoped) */
+.legacy-ui .app {
+  display: flex;
+  min-height: 100vh;
+}
+.legacy-ui .sidebar {
+  width: 260px;
+  background: #0b0d12;
+  border-right: 1px solid var(--border);
+  padding: 24px 18px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.legacy-ui .content {
+  flex: 1;
+  padding: 24px;
+}
+
+/* brand + nav */
+.legacy-ui .brand-link {
+  display: block;
+  text-decoration: none;
+  margin-bottom: 18px;
+}
+.legacy-ui .brand {
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--text);
+}
+.legacy-ui .nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.legacy-ui .nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 10px 12px;
+  border-radius: 10px;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.legacy-ui .nav a:hover {
+  color: var(--text);
+  background: #10131b;
+}
+.legacy-ui .nav a.active {
+  color: #fff;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+/* cards / panels */
+.legacy-ui .card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* badges */
+.legacy-ui .badge {
+  display: inline-block;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.legacy-ui .badge.up {
+  color: #b8f7c9;
+  border-color: #244f37;
+  background: #0f1d17;
+}
+.legacy-ui .badge.down {
+  color: #ffc7c7;
+  border-color: #5e2323;
+  background: #221213;
+}
+.legacy-ui .badge.pending {
+  color: #ffe6b3;
+  border-color: #5e4b1c;
+  background: #201a0e;
+}
+
+/* status dot */
+.legacy-ui .dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-right: 8px;
+}
+.legacy-ui .dot.up {
+  background: var(--green);
+}
+.legacy-ui .dot.down {
+  background: var(--red);
+}
+.legacy-ui .dot.pending {
+  background: var(--amber);
+}
+
+/* table (scoped) */
+.legacy-ui .table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.legacy-ui .table th,
+.legacy-ui .table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.legacy-ui .table th {
+  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+}
+.legacy-ui .table tr:hover td {
+  background: #121523;
+}
+
+/* HERO “LIVE” badge (scoped) */
+.legacy-ui .badge.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--blue-2);
+  background: #2563eb1a;
+  border-color: #2563eb66;
+  padding: 6px 14px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+.legacy-ui .badge.live .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--blue-2);
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6);
+  animation: livePulse 1.6s infinite;
+}
+@keyframes livePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(37, 99, 235, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+  }
+}
