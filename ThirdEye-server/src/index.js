@@ -81,6 +81,8 @@ process.on("uncaughtException", (err) => {
 app.use('/api/traffic-lite', require('./routes/trafficLite'));
   app.use("/api", cronRouter);
   app.use("/api/incidents", require("./routes/incidents"));
+  
+app.use('/api/cron', cronRoutes);  
   // health + root …
   const PORT = process.env.PORT || 5000;
   const health = (_req, res) => {
