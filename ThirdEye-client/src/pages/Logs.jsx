@@ -521,85 +521,90 @@ export default function Logs() {
       </Box>
 
       {/* Table */}
-      <Box
-        bg="surface"
-        border="1px solid"
-        borderColor="border"
-        rounded="xl"
-        p={0}
-      >
-        <Box px={4} py={3}>
-          <Text fontWeight="semibold">Incident history</Text>
-        </Box>
-        <Divider borderColor="border" />
-        <Table size="sm" variant="simple">
-          <Thead>
-            <Tr>
-              <Th>Site</Th>
-              <Th>Status</Th>
-              <Th>Start</Th>
-              <Th>End</Th>
-              <Th>Duration</Th>
-              <Th>Reason</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
-            {loading && (
-              <Tr>
-                <Td colSpan={6}>
-                  <HStack p={3}>
-                    <Spinner size="sm" />
-                    <Text>Loading…</Text>
-                  </HStack>
+     {/* Table */}
+<Box
+  bg="surface"
+  border="1px solid"
+  borderColor="border"
+  rounded="xl"
+  p={0}
+>
+  <Box px={4} py={3}>
+    <Text fontWeight="semibold">Incident history</Text>
+  </Box>
+  <Divider borderColor="border" />
+
+  {/* The table is now wrapped in a Box with a max height and scrollbar */}
+  <Box maxH="500px" overflowY="auto">
+    <Table size="sm" variant="simple">
+      <Thead>
+        <Tr>
+          <Th>Site</Th>
+          <Th>Status</Th>
+          <Th>Start</Th>
+          <Th>End</Th>
+          <Th>Duration</Th>
+          <Th>Reason</Th>
+        </Tr>
+      </Thead>
+      <Tbody>
+        {loading && (
+          <Tr>
+            <Td colSpan={6}>
+              <HStack p={3}>
+                <Spinner size="sm" />
+                <Text>Loading…</Text>
+              </HStack>
+            </Td>
+          </Tr>
+        )}
+        {!loading && filtered.length === 0 && (
+          <Tr>
+            <Td colSpan={6}>
+              <Text px={4} py={3} color="muted">
+                No incidents found.
+              </Text>
+            </Td>
+          </Tr>
+        )}
+        {!loading &&
+          filtered.map((it) => {
+            const ongoing = !it.endedAt && !it.endTime;
+            const started = it.startedAt || it.startTime;
+            const ended = it.endedAt || it.endTime;
+            return (
+              <Tr key={it._id}>
+                <Td>
+                  <a href={`/site?siteId=${it.siteId}`}>
+                    <Text noOfLines={1}>{it.siteUrl}</Text>
+                  </a>
                 </Td>
-              </Tr>
-            )}
-            {!loading && filtered.length === 0 && (
-              <Tr>
-                <Td colSpan={6}>
-                  <Text px={4} py={3} color="muted">
-                    No incidents found.
+                <Td>
+                  <Badge
+                    colorScheme={ongoing ? "red" : "green"}
+                    variant="subtle"
+                  >
+                    {ongoing ? "ONGOING" : "RESOLVED"}
+                  </Badge>
+                </Td>
+                <Td>{fmtDate(started)}</Td>
+                <Td>{fmtDate(ended)}</Td>
+                <Td>{fmtDur(started, ended)}</Td>
+                <Td>
+                  <Text
+                    noOfLines={1}
+                    title={it.reason || it.errorReason || ""}
+                  >
+                    {it.reason || it.errorReason || "—"}
                   </Text>
                 </Td>
               </Tr>
-            )}
-            {!loading &&
-              filtered.map((it) => {
-                const ongoing = !it.endedAt && !it.endTime;
-                const started = it.startedAt || it.startTime;
-                const ended = it.endedAt || it.endTime;
-                return (
-                  <Tr key={it._id}>
-                    <Td>
-                      <a href={`/site?siteId=${it.siteId}`}>
-                        <Text noOfLines={1}>{it.siteUrl}</Text>
-                      </a>
-                    </Td>
-                    <Td>
-                      <Badge
-                        colorScheme={ongoing ? "red" : "green"}
-                        variant="subtle"
-                      >
-                        {ongoing ? "ONGOING" : "RESOLVED"}
-                      </Badge>
-                    </Td>
-                    <Td>{fmtDate(started)}</Td>
-                    <Td>{fmtDate(ended)}</Td>
-                    <Td>{fmtDur(started, ended)}</Td>
-                    <Td>
-                      <Text
-                        noOfLines={1}
-                        title={it.reason || it.errorReason || ""}
-                      >
-                        {it.reason || it.errorReason || "—"}
-                      </Text>
-                    </Td>
-                  </Tr>
-                );
-              })}
-          </Tbody>
-        </Table>
-      </Box>
+            );
+          })}
+      </Tbody>
+    </Table>
+  </Box>
+</Box>
     </VStack>
   );
 }

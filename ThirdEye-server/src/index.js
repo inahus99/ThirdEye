@@ -45,7 +45,7 @@ process.on("uncaughtException", (err) => {
     .filter(Boolean);
   const originAllowlist = new Set(rawOrigins);
   console.log(
-    "✅ CORS allowlist:",
+    " CORS allowlist:",
     originAllowlist.size ? [...originAllowlist] : "(empty)"
   );
 
