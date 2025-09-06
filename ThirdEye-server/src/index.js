@@ -21,9 +21,10 @@ const websitesRouter = require("./routes/websites");
 const cronRouter = require("./routes/cron");
 const incidentsRouter = require("./routes/incidents");
 
-// ---- process error handlers (keep) ----
-process.on("unhandledRejection", (err) => { console.error("UNHANDLED REJECTION", err); process.exit(1); });
-process.on("uncaughtException",  (err) => { console.error("UNCAUGHT EXCEPTION",  err); process.exit(1); });
+// ---- process error handlers ----
+process.on("unhandledRejection", (e) => console.error("UNHANDLED REJECTION", e));
+process.on("uncaughtException",  (e) => console.error("UNCAUGHT EXCEPTION",  e));
+
 
 (async () => {
   const app = express();
