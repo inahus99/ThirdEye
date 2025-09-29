@@ -480,60 +480,55 @@ export default function Dashboard() {
         )}
       </Box>
 
-      {/* Table */}
-      <Box
-        bg="whiteAlpha.100"
-        border="1px solid"
-        borderColor="whiteAlpha.200"
-        rounded="lg"
-        p={2}
-      >
-        <Table size="sm" variant="simple">
-          <Thead>
-            <Tr>
-              <Th>Site</Th>
-              {/* REMOVED Type column */}
-              <Th>Status</Th>
-              <Th isNumeric>Response (ms)</Th>
-              <Th>Last Checked</Th>
-            </Tr>
-          </Thead>
-        </Table>
-
-        <Divider borderColor="whiteAlpha.200" />
-
-        <Table size="sm" variant="simple">
-          <Tbody>
-            {sites.map((s) => (
-              <Tr
-                key={s._id}
-                _hover={{ bg: "whiteAlpha.100", cursor: "pointer" }}
-                bg={selectedId === s._id ? "whiteAlpha.100" : "transparent"}
-                onClick={() => setSelectedId(s._id)}
-              >
-                <Td>
-                  <HStack spacing={2}>
-                    <StatusDot status={s.status} />
-                    <Text noOfLines={1}>{s.url || "-"}</Text>
-                  </HStack>
-                </Td>
-                {/* REMOVED Type Td */}
-                <Td>
-                  <Badge colorScheme={s.status === "UP" ? "green" : "red"}>
-                    {s.status || "PENDING"}
-                  </Badge>
-                </Td>
-                <Td isNumeric>{s.responseTime ?? "-"}</Td>
-                <Td>
-                  {s.lastChecked
-                    ? dayjs(s.lastChecked).format("YYYY-MM-DD HH:mm:ss")
-                    : "-"}
-                </Td>
-              </Tr>
-            ))}
-          </Tbody>
-        </Table>
-      </Box>
+    {/* Table */}
+<Box
+  bg="whiteAlpha.100"
+  border="1px solid"
+  borderColor="whiteAlpha.200"
+  rounded="lg"
+  p={2}
+>
+  <Table size="sm" variant="simple">
+    <Thead>
+      <Tr>
+        <Th>Site</Th>
+       
+        <Th>Status</Th>
+        <Th isNumeric>Response (ms)</Th>
+        <Th>Last Checked</Th>
+      </Tr>
+    </Thead>
+    <Tbody>
+      {sites.map((s) => (
+        <Tr
+          key={s._id}
+          _hover={{ bg: "whiteAlpha.100", cursor: "pointer" }}
+          bg={selectedId === s._id ? "whiteAlpha.100" : "transparent"}
+          onClick={() => setSelectedId(s._id)}
+        >
+          <Td>
+            <HStack spacing={2}>
+              <StatusDot status={s.status} />
+              <Text noOfLines={1}>{s.url || "-"}</Text>
+            </HStack>
+          </Td>
+      
+          <Td>
+            <Badge colorScheme={s.status === "UP" ? "green" : "red"}>
+              {s.status || "PENDING"}
+            </Badge>
+          </Td>
+          <Td isNumeric>{s.responseTime ?? "-"}</Td>
+          <Td>
+            {s.lastChecked
+              ? dayjs(s.lastChecked).format("YYYY-MM-DD HH:mm:ss")
+              : "-"}
+          </Td>
+        </Tr>
+      ))}
+    </Tbody>
+  </Table>
+</Box>
     </VStack>
   );
 }
