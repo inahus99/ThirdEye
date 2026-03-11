@@ -143,10 +143,10 @@ export default function Assets() {
           <Tooltip label="Trigger SSL & Domain refresh now">
             <Button
               size="sm"
-              leftIcon={<FiRefreshCw />}
+              leftIcon={refreshing ? undefined : <FiRefreshCw />}
               isLoading={refreshing}
-              loadingText="Refreshing…"
               onClick={refreshAssets}
+              minW="120px"
               variant="outline"
               borderColor="whiteAlpha.200"
               _hover={{ bg: "whiteAlpha.100", borderColor: "purple.400" }}

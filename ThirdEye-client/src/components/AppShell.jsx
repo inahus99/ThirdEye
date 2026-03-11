@@ -31,9 +31,9 @@ export default function AppShell({ children }) {
   const { user, logout } = useAuth();
 
   return (
-    <Flex minH="100vh">
+    <Flex h="100vh" overflow="hidden">
       {/* Sidebar */}
-      <Box as="aside" w={260} p={4} borderRight="1px solid" borderColor="whiteAlpha.200" bg="blackAlpha.400">
+      <Box as="aside" w={260} p={4} borderRight="1px solid" borderColor="whiteAlpha.200" bg="blackAlpha.400" overflowY="auto" flexShrink={0}>
         <HStack as={Link} to="/" spacing={2} mb={6} _hover={{ textDecoration: 'none', opacity: 0.9 }} cursor="pointer">
           <Box fontSize="xl">🛡️</Box>
           <Text fontWeight="bold">Third Eye</Text>
@@ -75,7 +75,7 @@ export default function AppShell({ children }) {
           </Menu>
         </Flex>
 
-        <Box as="main" p={6}>{children}</Box>
+        <Box as="main" p={6} flex="1" overflowY="auto">{children}</Box>
       </Flex>
     </Flex>
   );

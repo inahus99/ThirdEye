@@ -331,10 +331,9 @@ export default function Dashboard() {
         <Tooltip label="Trigger checks for all and reload">
           <IconButton
             aria-label="Refresh"
-            icon={<RepeatIcon />}
+          icon={<RepeatIcon />}
             onClick={manualRefresh}
             isLoading={refreshingAll}
-            loadingText="Refreshing"
             variant="outline"
             size="sm"
             borderColor="whiteAlpha.200"
