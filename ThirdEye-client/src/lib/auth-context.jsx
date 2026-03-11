@@ -1,71 +1,84 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { supabase } from './supabase';
+ import axios from 'axios';
+ 
+ const AuthCtx = createContext(null);
+ export const useAuth = () => useContext(AuthCtx);
+ 
+ // Configure a custom axios instance for the API
+ const api = axios.create({
+   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
+ });
+ 
+ // Intercept requests to add the auth token
+ api.interceptors.request.use((config) => {
+   const token = localStorage.getItem('thirdeye_token');
+   if (token) {
+     config.headers.Authorization = `Bearer ${token}`;
+   }
+   return config;
+ });
 
-const AuthCtx = createContext(null);
-export const useAuth = () => useContext(AuthCtx);
+ export function AuthProvider({ children }) {
+   const [user, setUser]   = useState(null);
+   const [ready, setReady] = useState(false);
+ 
+   useEffect(() => {
+     const initAuth = async () => {
+       const token = localStorage.getItem('thirdeye_token');
+       if (token) {
+         try {
+           const { data } = await api.get('/api/auth/me');
+           setUser(data.user);
+         } catch (e) {
+           console.error('[auth] Invalid/expired token:', e);
+           localStorage.removeItem('thirdeye_token');
+           setUser(null);
+         }
+       }
+       setReady(true);
+     };
+     initAuth();
+   }, []);
 
-export function AuthProvider({ children }) {
-  const [user, setUser]   = useState(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let unsub;
-
-    (async () => {
-      try {
-      
-        const { data: sessionData } = await supabase.auth.getSession();
-        setUser(sessionData?.session?.user ?? null);
-
-        const { data: userData } = await supabase.auth.getUser();
-        setUser(userData?.user ?? null);
-      } catch (e) {
-        console.error('[auth] bootstrap error:', e);
-      } finally {
-        setReady(true);
-      }
-    })();
-
-    // subscribe to auth state changes
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    unsub = () => listener?.subscription?.unsubscribe();
-
-    return () => {
-      try { unsub?.(); } catch {}
-    };
-  }, []);
-
-  // helpers with consistent error surfacing
-  const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    return data;
-  };
-
-  const register = async (email, password) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
-    return data;
-  };
-
-  const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-  };
+   // helpers with consistent error surfacing
+   const login = async (email, password) => {
+     try {
+       const { data } = await api.post('/api/auth/login', { email, password });
+       localStorage.setItem('thirdeye_token', data.token);
+       setUser(data.user);
+       return data;
+     } catch (err) {
+       throw new Error(err.response?.data?.error || 'Login failed');
+     }
+   };
+ 
+   const register = async (email, password) => {
+     try {
+       const { data } = await api.post('/api/auth/register', { email, password });
+       localStorage.setItem('thirdeye_token', data.token);
+       setUser(data.user);
+       return data;
+     } catch (err) {
+       throw new Error(err.response?.data?.error || 'Registration failed');
+     }
+   };
+ 
+   const logout = async () => {
+     localStorage.removeItem('thirdeye_token');
+     setUser(null);
+   };
 
   const value = useMemo(
-    () => ({
-      user,
-      ready,
-      isAuthenticated: !!user,
-      login,
-      register,
-      logout,
-    }),
-    [user, ready]
+     () => ({
+       user,
+       ready,
+       isAuthenticated: !!user,
+       login,
+       register,
+       logout,
+       api, // Expose configured api instance
+     }),
+     [user, ready]
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;

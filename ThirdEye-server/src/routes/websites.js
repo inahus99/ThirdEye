@@ -2,13 +2,17 @@
 const express = require("express");
 const Website = require("../models/Website");
 const { pingWebsite } = require("../services/monitoringService");
+const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
+
+// Protect all routes in this router
+router.use(requireAuth);
 
 // GET all websites
 router.get("/", async (_req, res) => {
   try {
-    const sites = await Website.find().sort({ updatedAt: -1 }).lean();
+    const sites = await Website.find({ userId: _req.user._id }).sort({ updatedAt: -1 }).lean();
     res.json({ ok: true, items: sites });
   } catch (e) {
     console.error(e);
@@ -50,7 +54,7 @@ router.post("/", async (req, res) => {
 
     // idempotency for HTTP url
     if (checkType === "HTTP") {
-      const exists = await Website.findOne({ url }).lean();
+      const exists = await Website.findOne({ url, userId: req.user._id }).lean();
       if (exists)
         return res
           .status(409)
@@ -58,6 +62,7 @@ router.post("/", async (req, res) => {
     }
 
     const site = await Website.create({
+      userId: req.user._id,
       url: url || null,
       checkType,
       expectedStatus,
@@ -91,9 +96,13 @@ router.put("/:id", async (req, res) => {
       if (k in req.body) updates[k] = req.body[k];
     });
 
-    const site = await Website.findByIdAndUpdate(id, updates, { new: true });
+    const site = await Website.findOneAndUpdate(
+      { _id: id, userId: req.user._id },
+      updates,
+      { new: true }
+    );
     if (!site)
-      return res.status(404).json({ ok: false, error: "Site not found" });
+      return res.status(404).json({ ok: false, error: "Site not found or unauthorized" });
     res.json({ ok: true, item: site });
   } catch (e) {
     console.error(e);
@@ -105,7 +114,10 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    await Website.findByIdAndDelete(id);
+    const deleted = await Website.findOneAndDelete({ _id: id, userId: req.user._id });
+    if (!deleted) {
+      return res.status(404).json({ ok: false, error: "Site not found or unauthorized" });
+    }
     res.json({ ok: true });
   } catch (e) {
     console.error(e);
@@ -117,12 +129,12 @@ router.delete("/:id", async (req, res) => {
 router.post("/:id/check-now", async (req, res) => {
   try {
     const { id } = req.params;
-    const site = await Website.findById(id);
+    const site = await Website.findOne({ _id: id, userId: req.user._id });
     if (!site)
-      return res.status(404).json({ ok: false, error: "Site not found" });
+      return res.status(404).json({ ok: false, error: "Site not found or unauthorized" });
 
     await pingWebsite(site);
-    const fresh = await Website.findById(id).lean();
+    const fresh = await Website.findOne({ _id: id, userId: req.user._id }).lean();
     res.json({ ok: true, item: fresh });
   } catch (e) {
     console.error("check-now error:", e);

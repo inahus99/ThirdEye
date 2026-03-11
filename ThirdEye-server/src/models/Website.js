@@ -17,6 +17,14 @@ function normalizeUrl(input) {
 
 const websiteSchema = new mongoose.Schema(
   {
+    // Owner of this website connection
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+
     // May be empty for TCP checks
     url: {
       type: String,

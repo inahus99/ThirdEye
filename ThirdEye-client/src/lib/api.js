@@ -34,14 +34,27 @@ async function handle(r) {
 export const api = {
   get: async (path, cfg = {}) => {
     const url = joinUrl(BASE, `/api${path}`);
-    const r = await fetch(url, { method: 'GET', ...cfg });
+    const token = localStorage.getItem('thirdeye_token');
+    const r = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...(cfg.headers || {})
+      },
+      ...cfg
+    });
     return handle(r);
   },
   post: async (path, body, cfg = {}) => {
     const url = joinUrl(BASE, `/api${path}`);
+    const token = localStorage.getItem('thirdeye_token');
     const r = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(cfg.headers || {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...(cfg.headers || {})
+      },
       body: JSON.stringify(body ?? {}),
       ...cfg,
     });
@@ -50,9 +63,14 @@ export const api = {
 
   del: async (path, cfg = {}) => {
     const url = joinUrl(BASE, `/api${path}`);
+    const token = localStorage.getItem('thirdeye_token');
     const r = await fetch(url, {
       method: 'DELETE',
-      ...(cfg || {}),
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...(cfg.headers || {})
+      },
+      ...cfg,
     });
     return handle(r);
   },

@@ -20,6 +20,7 @@ const analyticsRouter = require("./routes/analytics");
 const websitesRouter = require("./routes/websites");
 const cronRouter = require("./routes/cron");
 const incidentsRouter = require("./routes/incidents");
+const authRouter = require("./routes/auth");
 
 // ---- process error handlers ----
 process.on("unhandledRejection", (e) => console.error("UNHANDLED REJECTION", e));
@@ -73,6 +74,7 @@ process.on("uncaughtException",  (e) => console.error("UNCAUGHT EXCEPTION",  e))
   app.use("/api/traffic-lite", require("./routes/trafficLite"));
   app.use("/api/cron", cronRouter);
   app.use("/api/incidents", incidentsRouter);
+  app.use("/api/auth", authRouter);
 
   // --- health & root ---
   const health = (_req, res) => {

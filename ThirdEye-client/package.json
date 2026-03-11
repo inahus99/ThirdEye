@@ -15,7 +15,6 @@
     "@chakra-ui/utils": "^2.2.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@supabase/supabase-js": "^2.55.0",
     "axios": "^1.11.0",
     "chart.js": "^4.5.0",
     "dayjs": "^1.11.13",
