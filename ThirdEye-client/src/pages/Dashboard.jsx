@@ -1,5 +1,5 @@
 // src/pages/Dashboard.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Box,
   Button,
@@ -19,20 +19,26 @@ import {
   Stat,
   StatLabel,
   StatNumber,
+  StatHelpText,
   useToast,
   Divider,
   Spinner,
   IconButton,
   Collapse,
   Tooltip,
+  Skeleton,
 } from "@chakra-ui/react";
 import {
   AddIcon,
   RepeatIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  TimeIcon,
 } from "@chakra-ui/icons";
 import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -42,32 +48,74 @@ import {
   LinearScale,
   Tooltip as CTip,
   Legend,
+  Filler,
 } from "chart.js";
 import { api } from "../lib/api";
 import { socket } from "../lib/socket";
 
-ChartJS.register(
-  LineElement,
-  PointElement,
-  CategoryScale,
-  LinearScale,
-  CTip,
-  Legend
+dayjs.extend(relativeTime);
+
+ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, CTip, Legend, Filler);
+ChartJS.defaults.color = "#94a3b8";
+ChartJS.defaults.borderColor = "rgba(148,163,184,0.08)";
+
+const card = {
+  bg: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: "12px",
+  backdropFilter: "blur(8px)",
+};
+
+const StatusPulse = ({ status }) => (
+  <Box position="relative" display="inline-flex" alignItems="center">
+    {status === "UP" && (
+      <Box
+        position="absolute"
+        w="14px" h="14px"
+        rounded="full"
+        bg="green.400"
+        opacity={0.3}
+        animation="ping 1.5s cubic-bezier(0,0,0.2,1) infinite"
+        sx={{ "@keyframes ping": { "75%,100%": { transform: "scale(2)", opacity: 0 } } }}
+      />
+    )}
+    <Box
+      w="10px" h="10px"
+      rounded="full"
+      bg={status === "UP" ? "green.400" : status === "DOWN" ? "red.400" : "gray.500"}
+    />
+  </Box>
 );
 
-const StatusDot = ({ status }) => (
-  <Box
-    as="span"
-    w="10px"
-    h="10px"
-    rounded="full"
-    display="inline-block"
-    bg={
-      status === "UP" ? "green.400" : status === "DOWN" ? "red.400" : "gray.400"
-    }
-    mr="2"
-  />
-);
+const CHART_OPTIONS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 300 },
+  interaction: { mode: "index", intersect: false },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: "rgba(15,23,42,0.9)",
+      titleColor: "#e2e8f0",
+      bodyColor: "#94a3b8",
+      borderColor: "rgba(99,102,241,0.3)",
+      borderWidth: 1,
+      padding: 10,
+      callbacks: { label: (ctx) => ` ${ctx.parsed.y} ms` },
+    },
+  },
+  scales: {
+    x: {
+      grid: { color: "rgba(148,163,184,0.06)", drawBorder: false },
+      ticks: { maxTicksLimit: 8, font: { size: 10 } },
+    },
+    y: {
+      beginAtZero: true,
+      grid: { color: "rgba(148,163,184,0.06)", drawBorder: false },
+      ticks: { font: { size: 10 }, callback: (v) => `${v}ms` },
+    },
+  },
+};
 
 export default function Dashboard() {
   const toast = useToast();
@@ -75,93 +123,67 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [refreshingAll, setRefreshingAll] = useState(false);
-
-  // Simplified state for HTTP-only checks
   const [newUrl, setNewUrl] = useState("");
-
-  // ADVANCED add form state
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [expectedStatus, setExpectedStatus] = useState(200);
   const [bodyMustContain, setBodyMustContain] = useState("");
   const [timeoutMs, setTimeoutMs] = useState(10000);
-
   const [selectedId, setSelectedId] = useState(null);
+  const [historyMap, setHistoryMap] = useState({});
   const [lastManual, setLastManual] = useState(null);
-
-  // in-memory history per site
-  const historyRef = useRef({});
   const prevStatusRef = useRef({});
   const lastToastAtRef = useRef(0);
-  const TOAST_MIN_GAP_MS = 5000;
 
   const normalizeList = (res) => (Array.isArray(res) ? res : res?.items || []);
 
-  const loadHistoryForSite = async (sid, limit = 50) => {
+  const loadHistoryForSite = useCallback(async (sid, limit = 60) => {
     if (!sid) return;
     try {
-      const res = await api.get(
-        `/analytics/checks?siteId=${encodeURIComponent(sid)}&limit=${limit}`
-      );
-      const rows = res?.items || [];
-      const pts = (Array.isArray(rows) ? rows : [])
+      const res = await api.get(`/analytics/checks?siteId=${encodeURIComponent(sid)}&limit=${limit}`);
+      const rows = Array.isArray(res?.items) ? res.items : [];
+      const pts = rows
         .reverse()
         .filter((r) => typeof r.responseTime === "number")
         .map((r) => ({ t: r.createdAt, rt: r.responseTime }));
-      historyRef.current[sid] = pts.slice(-100);
-    } catch {
-      /* ignore */
-    }
-  };
+      setHistoryMap((prev) => ({ ...prev, [sid]: pts.slice(-100) }));
+    } catch { /* ignore */ }
+  }, []);
 
-  // initial load
+  // Initial load
   useEffect(() => {
     (async () => {
       try {
         const res = await api.get("/websites");
         const list = normalizeList(res);
         setSites(list);
-        if (list[0]) setSelectedId(list[0]._id);
+        if (list[0]) {
+          setSelectedId(list[0]._id);
+          // Eagerly load history for all sites in parallel
+          list.forEach((s) => loadHistoryForSite(s._id, 60));
+        }
       } catch (e) {
-        console.error(e);
-        toast({
-          title: "Failed to load websites",
-          description: e.message,
-          status: "error",
-        });
+        toast({ title: "Failed to load websites", description: e.message, status: "error" });
       } finally {
         setLoading(false);
       }
     })();
-  }, [toast]);
+  }, []);
 
-  // load chart data when user changes the selected row
-  useEffect(() => {
-    if (selectedId) loadHistoryForSite(selectedId, 50).catch(() => {});
-  }, [selectedId]);
-
-  // live events
+  // Live socket events
   useEffect(() => {
     const onCheck = (evt) => {
       const siteId = evt.site?.toString();
       const { status, responseTime, createdAt } = evt;
 
-      setSites((prev) =>
-        prev.map((s) => {
-          if (s._id === siteId) {
-            return { ...s, status, responseTime, lastChecked: createdAt };
-          }
-          return s;
-        })
-      );
+      setSites((prev) => prev.map((s) => s._id === siteId ? { ...s, status, responseTime, lastChecked: createdAt } : s));
 
       const prev = prevStatusRef.current[siteId];
       if (prev && prev !== status) {
         const now = Date.now();
-        if (now - lastToastAtRef.current > TOAST_MIN_GAP_MS) {
-          const site = sites.find((s) => s._id === siteId);
+        if (now - lastToastAtRef.current > 5000) {
           toast({
-            title: `Site ${status === "DOWN" ? "DOWN" : "UP"}`,
-            description: `${site?.url || siteId} is now ${status}.`,
+            title: `Site ${status}`,
+            description: `${siteId} is now ${status}.`,
             status: status === "DOWN" ? "error" : "success",
           });
           lastToastAtRef.current = now;
@@ -169,30 +191,17 @@ export default function Dashboard() {
       }
       prevStatusRef.current[siteId] = status;
 
-      if (selectedId === siteId && typeof responseTime === "number") {
-        const arr = historyRef.current[siteId] || [];
-        arr.push({ t: createdAt, rt: responseTime });
-        historyRef.current[siteId] = arr.slice(-100);
+      if (typeof responseTime === "number") {
+        setHistoryMap((prev) => {
+          const arr = [...(prev[siteId] || []), { t: createdAt, rt: responseTime }];
+          return { ...prev, [siteId]: arr.slice(-100) };
+        });
       }
     };
 
     const onSiteUpdate = (payload) => {
       if (!payload?._id) return;
-      setSites((prev) =>
-        prev.map((s) => (s._id === payload._id ? { ...s, ...payload } : s))
-      );
-      if (
-        selectedId &&
-        payload._id === selectedId &&
-        typeof payload.responseTime === "number"
-      ) {
-        const arr = historyRef.current[selectedId] || [];
-        arr.push({
-          t: payload.lastChecked || new Date().toISOString(),
-          rt: payload.responseTime,
-        });
-        historyRef.current[selectedId] = arr.slice(-100);
-      }
+      setSites((prev) => prev.map((s) => s._id === payload._id ? { ...s, ...payload } : s));
     };
 
     socket.on("analytics:check", onCheck);
@@ -201,63 +210,60 @@ export default function Dashboard() {
       socket.off("analytics:check", onCheck);
       socket.off("site:update", onSiteUpdate);
     };
-  }, [toast, selectedId, sites]);
+  }, [toast]);
 
-  const upCount = useMemo(
-    () => sites.filter((s) => s.status === "UP").length,
-    [sites]
-  );
-  const downCount = useMemo(
-    () => sites.filter((s) => s.status === "DOWN").length,
-    [sites]
-  );
-  const selected = useMemo(
-    () => sites.find((s) => s._id === selectedId) || null,
-    [sites, selectedId]
-  );
+  const upCount = useMemo(() => sites.filter((s) => s.status === "UP").length, [sites]);
+  const downCount = useMemo(() => sites.filter((s) => s.status === "DOWN").length, [sites]);
+  const selected = useMemo(() => sites.find((s) => s._id === selectedId) || null, [sites, selectedId]);
+  const avgResponseTime = useMemo(() => {
+    const withTime = sites.filter((s) => typeof s.responseTime === "number");
+    if (!withTime.length) return null;
+    return Math.round(withTime.reduce((a, s) => a + s.responseTime, 0) / withTime.length);
+  }, [sites]);
 
   const chartData = useMemo(() => {
     if (!selected) return null;
-    const pts = historyRef.current[selected._id] || [];
+    const pts = historyMap[selected._id] || [];
+    if (!pts.length) return null;
     return {
-      labels: pts.map((p) => dayjs(p.t).format("HH:mm:ss")),
-      datasets: [
-        {
-          label: selected.url || "Selected",
-          data: pts.map((p) => p.rt),
-          borderWidth: 2,
-          tension: 0.25,
-          pointRadius: 0,
+      labels: pts.map((p) => dayjs(p.t).format("HH:mm")),
+      datasets: [{
+        label: "Response Time",
+        data: pts.map((p) => p.rt),
+        borderColor: selected.status === "DOWN" ? "#f87171" : "#818cf8",
+        borderWidth: 2,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: selected.status === "DOWN" ? "#f87171" : "#818cf8",
+        fill: true,
+        backgroundColor: (ctx) => {
+          const chart = ctx.chart;
+          const { ctx: c, chartArea } = chart;
+          if (!chartArea) return "transparent";
+          const grad = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          const color = selected.status === "DOWN" ? "248,113,113" : "129,140,248";
+          grad.addColorStop(0, `rgba(${color},0.3)`);
+          grad.addColorStop(1, `rgba(${color},0)`);
+          return grad;
         },
-      ],
+      }],
     };
-  }, [selected]);
-
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  }, [selected, historyMap]);
 
   const manualRefresh = async () => {
     try {
       setRefreshingAll(true);
       for (const s of sites) {
-        try {
-          await api.post(`/websites/${s._id}/check-now`);
-        } catch {
-          /* ignore individual failures */
-        }
-        await sleep(150);
+        try { await api.post(`/websites/${s._id}/check-now`); } catch { /* ignore */ }
       }
       const res = await api.get("/websites");
       const list = normalizeList(res);
       setSites(list);
-      const keep = list.some((x) => x._id === selectedId);
-      const sid = keep ? selectedId : list[0]?._id ?? null;
-      setSelectedId(sid);
-      if (sid) await loadHistoryForSite(sid, 50);
+      if (selectedId) await loadHistoryForSite(selectedId, 60);
       setLastManual(new Date());
     } catch (e) {
-      console.error(e);
-      const msg = e?.response?.data?.error || e.message || "Unknown error";
-      toast({ title: "Refresh failed", description: msg, status: "error" });
+      toast({ title: "Refresh failed", description: e.message, status: "error" });
     } finally {
       setRefreshingAll(false);
     }
@@ -265,41 +271,31 @@ export default function Dashboard() {
 
   const addSite = async (e) => {
     e.preventDefault();
+    if (!newUrl.trim()) { toast({ title: "URL is required", status: "warning" }); return; }
     try {
       setAdding(true);
-      if (!newUrl.trim()) {
-        toast({ title: "URL is required", status: "warning" });
-        setAdding(false);
-        return;
-      }
-      const payload = {
-        checkType: "HTTP", // Always HTTP
+      const res = await api.post("/websites", {
+        checkType: "HTTP",
         timeoutMs,
         url: newUrl.trim(),
         expectedStatus,
         bodyMustContain: bodyMustContain.trim(),
-      };
-      const res = await api.post("/websites", payload);
+      });
       const site = res?.item || res?.site || res;
       setSites((prev) => [site, ...prev]);
-      setSelectedId(site?._id ?? site?.id ?? null);
+      setSelectedId(site?._id);
       setNewUrl("");
       setBodyMustContain("");
-      toast({ title: "Added check", status: "success" });
+      toast({ title: "Monitor added!", status: "success" });
     } catch (e) {
-      const existing = e?.response?.data?.site || e?.body?.site || null;
+      const existing = e?.body?.site;
       if (existing) {
-        setSites((prev) => {
-          const already = prev.some((p) => p._id === existing._id);
-          return already ? prev : [existing, ...prev];
-        });
+        setSites((prev) => prev.some((p) => p._id === existing._id) ? prev : [existing, ...prev]);
         setSelectedId(existing._id);
         setNewUrl("");
-        toast({ title: "Check already exists", status: "info" });
+        toast({ title: "Already monitoring this site", status: "info" });
       } else {
-        console.error(e);
-        const msg = e?.response?.data?.error || e.message || "Unknown error";
-        toast({ title: "Add failed", description: msg, status: "error" });
+        toast({ title: "Add failed", description: e.message, status: "error" });
       }
     } finally {
       setAdding(false);
@@ -308,17 +304,30 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <Flex align="center" justify="center" minH="60vh">
-        <Spinner mr="3" /> <Text>Loading dashboard…</Text>
-      </Flex>
+      <VStack align="stretch" spacing={6}>
+        <Skeleton h="40px" rounded="lg" />
+        <Skeleton h="60px" rounded="lg" />
+        <HStack spacing={4}><Skeleton flex="1" h="90px" rounded="lg" /><Skeleton flex="1" h="90px" rounded="lg" /><Skeleton flex="1" h="90px" rounded="lg" /></HStack>
+        <Skeleton h="200px" rounded="lg" />
+        <Skeleton h="220px" rounded="lg" />
+      </VStack>
     );
   }
 
   return (
-    <VStack align="stretch" spacing={6}>
-      {/* Title + refresh */}
+    <VStack align="stretch" spacing={5}>
+      {/* Header */}
       <Flex wrap="wrap" justify="space-between" align="center" gap={4}>
-        <Heading size="lg">Server Monitoring</Heading>
+        <VStack align="start" spacing={0}>
+          <Heading size="lg" bgGradient="linear(to-r, white, whiteAlpha.700)" bgClip="text">
+            Server Monitoring
+          </Heading>
+          {lastManual && (
+            <Text fontSize="xs" color="whiteAlpha.500">
+              Last refresh: {dayjs(lastManual).fromNow()}
+            </Text>
+          )}
+        </VStack>
         <Tooltip label="Trigger checks for all and reload">
           <IconButton
             aria-label="Refresh"
@@ -328,18 +337,14 @@ export default function Dashboard() {
             loadingText="Refreshing"
             variant="outline"
             size="sm"
+            borderColor="whiteAlpha.200"
+            _hover={{ bg: "whiteAlpha.100", borderColor: "whiteAlpha.400" }}
           />
         </Tooltip>
       </Flex>
 
-      {/* Add checker card */}
-      <Box
-        bg="whiteAlpha.100"
-        border="1px solid"
-        borderColor="whiteAlpha.200"
-        rounded="lg"
-        p={4}
-      >
+      {/* Add checker */}
+      <Box {...card} p={4}>
         <form onSubmit={addSite}>
           <Flex gap={3} wrap="wrap" align="center">
             <Input
@@ -348,55 +353,48 @@ export default function Dashboard() {
               onChange={(e) => setNewUrl(e.target.value)}
               flex="1"
               minW="260px"
+              bg="whiteAlpha.50"
+              border="1px solid"
+              borderColor="whiteAlpha.200"
+              _hover={{ borderColor: "whiteAlpha.400" }}
+              _focus={{ borderColor: "purple.400", boxShadow: "0 0 0 1px rgba(139,92,246,0.4)" }}
             />
             <Button
               type="submit"
               leftIcon={<AddIcon />}
               isLoading={adding}
-              colorScheme="blue"
+              bgGradient="linear(to-r, purple.500, blue.500)"
+              color="white"
+              _hover={{ bgGradient: "linear(to-r, purple.600, blue.600)", transform: "translateY(-1px)", shadow: "lg" }}
+              _active={{ transform: "translateY(0)" }}
+              transition="all 0.2s"
               px={6}
             >
-              Add
+              Add Monitor
             </Button>
           </Flex>
-
           <HStack justify="flex-end" mt={2}>
             <Button
               size="xs"
               variant="ghost"
+              color="whiteAlpha.600"
               onClick={() => setShowAdvanced((s) => !s)}
               leftIcon={showAdvanced ? <ChevronUpIcon /> : <ChevronDownIcon />}
             >
               Advanced options
             </Button>
           </HStack>
-
           <Collapse in={showAdvanced} animateOpacity>
             <HStack spacing={3} wrap="wrap" mt={2}>
-              <Input
-                placeholder="Timeout (ms)"
-                type="number"
-                value={timeoutMs}
-                onChange={(e) =>
-                  setTimeoutMs(parseInt(e.target.value || "10000", 10))
-                }
-                maxW="180px"
-              />
-              <Input
-                placeholder="Expected status (e.g. 200/301/403)"
-                type="number"
-                value={expectedStatus}
-                onChange={(e) =>
-                  setExpectedStatus(parseInt(e.target.value || "200", 10))
-                }
-                maxW="220px"
-              />
-              <Input
-                placeholder="Response must contain… (optional)"
-                value={bodyMustContain}
+              <Input placeholder="Timeout (ms)" type="number" value={timeoutMs}
+                onChange={(e) => setTimeoutMs(parseInt(e.target.value || "10000", 10))}
+                maxW="180px" bg="whiteAlpha.50" borderColor="whiteAlpha.200" size="sm" />
+              <Input placeholder="Expected status (e.g. 200)" type="number" value={expectedStatus}
+                onChange={(e) => setExpectedStatus(parseInt(e.target.value || "200", 10))}
+                maxW="220px" bg="whiteAlpha.50" borderColor="whiteAlpha.200" size="sm" />
+              <Input placeholder="Response must contain… (optional)" value={bodyMustContain}
                 onChange={(e) => setBodyMustContain(e.target.value)}
-                minW="260px"
-              />
+                minW="260px" bg="whiteAlpha.50" borderColor="whiteAlpha.200" size="sm" />
             </HStack>
           </Collapse>
         </form>
@@ -404,131 +402,155 @@ export default function Dashboard() {
 
       {/* Stats */}
       <HStack spacing={4}>
-        <Stat
-          flex="1"
-          bg="whiteAlpha.100"
-          border="1px solid"
-          borderColor="whiteAlpha.200"
-          rounded="lg"
-          p={4}
-        >
-          <StatLabel>Total Checks</StatLabel>
-          <StatNumber>{sites.length}</StatNumber>
-        </Stat>
-        <Stat
-          flex="1"
-          bg="whiteAlpha.100"
-          border="1px solid"
-          borderColor="whiteAlpha.200"
-          rounded="lg"
-          p={4}
-        >
-          <StatLabel>Up</StatLabel>
-          <StatNumber color="green.300">{upCount}</StatNumber>
-        </Stat>
-        <Stat
-          flex="1"
-          bg="whiteAlpha.100"
-          border="1px solid"
-          borderColor="whiteAlpha.200"
-          rounded="lg"
-          p={4}
-        >
-          <StatLabel>Down</StatLabel>
-          <StatNumber color="red.300">{downCount}</StatNumber>
-        </Stat>
+        <Box {...card} flex="1" p={5}>
+          <Stat>
+            <StatLabel color="whiteAlpha.600" fontSize="xs" textTransform="uppercase" letterSpacing="wider">Total Monitors</StatLabel>
+            <StatNumber fontSize="2xl" fontWeight="bold">{sites.length}</StatNumber>
+            <StatHelpText color="whiteAlpha.500" m={0}><TimeIcon mr={1} />Active checks</StatHelpText>
+          </Stat>
+        </Box>
+        <Box {...card} flex="1" p={5} borderColor={upCount > 0 ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.1)"}>
+          <Stat>
+            <StatLabel color="whiteAlpha.600" fontSize="xs" textTransform="uppercase" letterSpacing="wider">Online</StatLabel>
+            <StatNumber fontSize="2xl" fontWeight="bold" color="green.300">
+              <ArrowUpIcon mr={1} boxSize={4} />{upCount}
+            </StatNumber>
+            <StatHelpText color="whiteAlpha.500" m={0}>Sites up</StatHelpText>
+          </Stat>
+        </Box>
+        <Box {...card} flex="1" p={5} borderColor={downCount > 0 ? "rgba(248,113,113,0.3)" : "rgba(255,255,255,0.1)"}>
+          <Stat>
+            <StatLabel color="whiteAlpha.600" fontSize="xs" textTransform="uppercase" letterSpacing="wider">Offline</StatLabel>
+            <StatNumber fontSize="2xl" fontWeight="bold" color={downCount > 0 ? "red.300" : "whiteAlpha.600"}>
+              <ArrowDownIcon mr={1} boxSize={4} />{downCount}
+            </StatNumber>
+            <StatHelpText color="whiteAlpha.500" m={0}>Sites down</StatHelpText>
+          </Stat>
+        </Box>
+        {avgResponseTime !== null && (
+          <Box {...card} flex="1" p={5}>
+            <Stat>
+              <StatLabel color="whiteAlpha.600" fontSize="xs" textTransform="uppercase" letterSpacing="wider">Avg Response</StatLabel>
+              <StatNumber fontSize="2xl" fontWeight="bold" color="blue.300">{avgResponseTime}<Text as="span" fontSize="sm" ml={1} color="whiteAlpha.500">ms</Text></StatNumber>
+              <StatHelpText color="whiteAlpha.500" m={0}>Across all sites</StatHelpText>
+            </Stat>
+          </Box>
+        )}
       </HStack>
 
       {/* Chart */}
-      <Box
-        bg="whiteAlpha.100"
-        border="1px solid"
-        borderColor="whiteAlpha.200"
-        rounded="lg"
-        p={4}
-      >
-        <Flex justify="space-between" align="center" mb={3}>
-          <HStack>
-            <Text fontWeight="bold">Live Response Time</Text>
+      <Box {...card} p={5}>
+        <Flex justify="space-between" align="center" mb={4}>
+          <HStack spacing={3}>
+            <Text fontWeight="semibold" fontSize="sm" color="whiteAlpha.900">Live Response Time</Text>
             {selected && (
-              <Badge colorScheme={selected.status === "UP" ? "green" : "red"}>
-                <StatusDot status={selected.status} />
-                {selected.status || "PENDING"}
+              <Badge
+                px={2} py={1}
+                rounded="full"
+                fontSize="xs"
+                colorScheme={selected.status === "UP" ? "green" : selected.status === "DOWN" ? "red" : "gray"}
+                variant="subtle"
+              >
+                <HStack spacing={1}>
+                  <StatusPulse status={selected.status} />
+                  <Text>{selected.url ? new URL(selected.url).hostname : "—"}</Text>
+                </HStack>
               </Badge>
             )}
           </HStack>
-          <Text fontSize="sm" color="whiteAlpha.700">
-            Last refresh:{" "}
+          <Text fontSize="xs" color="whiteAlpha.400">
             {lastManual ? dayjs(lastManual).format("HH:mm:ss") : "–"}
           </Text>
         </Flex>
-        <Divider borderColor="whiteAlpha.300" mb={4} />
-        {chartData && chartData.labels.length > 0 ? (
-          <Line
-            data={chartData}
-            options={{
-              plugins: { legend: { display: false } },
-              scales: {
-                x: { grid: { color: "rgba(255,255,255,0.06)" } },
-                y: { grid: { color: "rgba(255,255,255,0.06)" } },
-              },
-            }}
-            height={80}
-          />
-        ) : (
-          <Text color="whiteAlpha.700">Waiting for checks…</Text>
-        )}
+        <Box h="180px">
+          {chartData ? (
+            <Line data={chartData} options={CHART_OPTIONS} />
+          ) : (
+            <Flex h="100%" align="center" justify="center" direction="column" gap={2}>
+              <Box fontSize="32px">📡</Box>
+              <Text color="whiteAlpha.500" fontSize="sm">Waiting for checks…</Text>
+              <Text color="whiteAlpha.300" fontSize="xs">Click a site below or trigger a refresh</Text>
+            </Flex>
+          )}
+        </Box>
       </Box>
 
-    {/* Table */}
-<Box
-  bg="whiteAlpha.100"
-  border="1px solid"
-  borderColor="whiteAlpha.200"
-  rounded="lg"
-  p={2}
->
-  <Table size="sm" variant="simple">
-    <Thead>
-      <Tr>
-        <Th>Site</Th>
-       
-        <Th>Status</Th>
-        <Th isNumeric>Response (ms)</Th>
-        <Th>Last Checked</Th>
-      </Tr>
-    </Thead>
-    <Tbody>
-      {sites.map((s) => (
-        <Tr
-          key={s._id}
-          _hover={{ bg: "whiteAlpha.100", cursor: "pointer" }}
-          bg={selectedId === s._id ? "whiteAlpha.100" : "transparent"}
-          onClick={() => setSelectedId(s._id)}
-        >
-          <Td>
-            <HStack spacing={2}>
-              <StatusDot status={s.status} />
-              <Text noOfLines={1}>{s.url || "-"}</Text>
-            </HStack>
-          </Td>
-      
-          <Td>
-            <Badge colorScheme={s.status === "UP" ? "green" : "red"}>
-              {s.status || "PENDING"}
-            </Badge>
-          </Td>
-          <Td isNumeric>{s.responseTime ?? "-"}</Td>
-          <Td>
-            {s.lastChecked
-              ? dayjs(s.lastChecked).format("YYYY-MM-DD HH:mm:ss")
-              : "-"}
-          </Td>
-        </Tr>
-      ))}
-    </Tbody>
-  </Table>
-</Box>
+      {/* Table */}
+      <Box {...card} overflow="hidden">
+        <Box px={5} py={3} borderBottom="1px solid rgba(255,255,255,0.08)">
+          <Text fontWeight="semibold" fontSize="sm" color="whiteAlpha.800">Monitors</Text>
+        </Box>
+        <Table size="sm" variant="unstyled">
+          <Thead>
+            <Tr borderBottom="1px solid rgba(255,255,255,0.06)">
+              <Th color="whiteAlpha.400" fontSize="xs" textTransform="uppercase" py={3} px={5}>Site</Th>
+              <Th color="whiteAlpha.400" fontSize="xs" textTransform="uppercase">Status</Th>
+              <Th color="whiteAlpha.400" fontSize="xs" textTransform="uppercase" isNumeric>Response</Th>
+              <Th color="whiteAlpha.400" fontSize="xs" textTransform="uppercase">Last Checked</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {sites.length === 0 && (
+              <Tr>
+                <Td colSpan={4} textAlign="center" py={10}>
+                  <VStack spacing={2}>
+                    <Text fontSize="xl">🔭</Text>
+                    <Text color="whiteAlpha.500" fontSize="sm">No monitors yet. Add one above.</Text>
+                  </VStack>
+                </Td>
+              </Tr>
+            )}
+            {sites.map((s) => (
+              <Tr
+                key={s._id}
+                cursor="pointer"
+                transition="background 0.15s"
+                bg={selectedId === s._id ? "rgba(129,140,248,0.08)" : "transparent"}
+                _hover={{ bg: selectedId === s._id ? "rgba(129,140,248,0.12)" : "rgba(255,255,255,0.03)" }}
+                onClick={() => { setSelectedId(s._id); loadHistoryForSite(s._id, 60); }}
+                borderLeft={selectedId === s._id ? "2px solid" : "2px solid transparent"}
+                borderLeftColor={selectedId === s._id ? "purple.400" : "transparent"}
+              >
+                <Td py={3} px={5}>
+                  <HStack spacing={3}>
+                    <StatusPulse status={s.status} />
+                    <VStack align="start" spacing={0}>
+                      <Text fontSize="sm" fontWeight="medium" noOfLines={1}>
+                        {s.url ? (() => { try { return new URL(s.url).hostname; } catch { return s.url; } })() : "—"}
+                      </Text>
+                      <Text fontSize="xs" color="whiteAlpha.400" noOfLines={1}>{s.url}</Text>
+                    </VStack>
+                  </HStack>
+                </Td>
+                <Td py={3}>
+                  <Badge
+                    px={2} py={0.5} rounded="full" fontSize="xs" fontWeight="semibold"
+                    colorScheme={s.status === "UP" ? "green" : s.status === "DOWN" ? "red" : "gray"}
+                    variant="subtle"
+                  >
+                    {s.status || "PENDING"}
+                  </Badge>
+                </Td>
+                <Td isNumeric py={3}>
+                  <Text fontSize="sm" color={s.responseTime > 500 ? "yellow.300" : "whiteAlpha.800"} fontFamily="mono">
+                    {typeof s.responseTime === "number" ? `${s.responseTime}ms` : "—"}
+                  </Text>
+                </Td>
+                <Td py={3}>
+                  <VStack align="start" spacing={0}>
+                    <Text fontSize="xs" color="whiteAlpha.700">
+                      {s.lastChecked ? dayjs(s.lastChecked).fromNow() : "—"}
+                    </Text>
+                    <Text fontSize="xs" color="whiteAlpha.300">
+                      {s.lastChecked ? dayjs(s.lastChecked).format("HH:mm:ss") : ""}
+                    </Text>
+                  </VStack>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      </Box>
     </VStack>
   );
 }

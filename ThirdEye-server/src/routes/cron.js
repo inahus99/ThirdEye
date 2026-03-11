@@ -5,6 +5,7 @@ const {
   runDailyAssetChecks,
   debugAsset,
 } = require("../services/monitoringService");
+const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -46,6 +47,16 @@ router.get("/debug-asset", async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message || "server_error" });
   }
+});
+
+// POST /api/cron/refresh-assets — JWT-protected (no API key needed)
+// Triggers SSL + Domain checks for all sites in the background
+router.post("/refresh-assets", requireAuth, async (req, res) => {
+  // Respond immediately, run in background
+  res.json({ ok: true, message: "Asset refresh started" });
+  runDailyAssetChecks().catch((e) =>
+    console.error("refresh-assets error", e)
+  );
 });
 
 module.exports = router;
