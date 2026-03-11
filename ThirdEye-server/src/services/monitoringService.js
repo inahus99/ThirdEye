@@ -197,9 +197,44 @@ async function runDailyAssetChecks() {
         site.domainDaysLeft = null;
       }
 
-      await site.save();
-    })
-  );
-}
-
-module.exports = { setIO, pingWebsite, runAllChecks, runDailyAssetChecks };
+       // Record Check
+       site.sslCheckedAt = new Date();
+       site.domainCheckedAt = new Date();
+       await site.save();
+     })
+   );
+ }
+ 
+ /** Run asset check for a single site */
+ async function runAssetCheckForSite(site) {
+   const host = hostnameFromUrl(site.url);
+   if (!host) return;
+ 
+   try {
+     const { validTo } = await getCertInfo(host);
+     site.sslValidTo = validTo || null;
+     site.sslDaysLeft = validTo ? daysLeft(validTo) : null;
+   } catch {
+     site.sslValidTo = null;
+     site.sslDaysLeft = null;
+   }
+ 
+   try {
+     const info = await getDomainExpirySmart(host);
+     site.domainRoot = info.domainRoot || null;
+     site.domainSource = info.source || null;
+     site.domainExpiresAt = info.domainExpiresAt || null;
+     site.domainDaysLeft = info.domainDaysLeft ?? null;
+   } catch {
+     site.domainRoot = null;
+     site.domainSource = "error";
+     site.domainExpiresAt = null;
+     site.domainDaysLeft = null;
+   }
+   
+   site.sslCheckedAt = new Date();
+   site.domainCheckedAt = new Date();
+   await site.save();
+ }
+ 
+ module.exports = { setIO, pingWebsite, runAllChecks, runDailyAssetChecks, runAssetCheckForSite };

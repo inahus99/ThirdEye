@@ -1,7 +1,7 @@
 // src/routes/websites.js
 const express = require("express");
 const Website = require("../models/Website");
-const { pingWebsite } = require("../services/monitoringService");
+const { pingWebsite, runAssetCheckForSite } = require("../services/monitoringService");
 const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
@@ -72,6 +72,9 @@ router.post("/", async (req, res) => {
       timeoutMs,
       status: "PENDING",
     });
+
+    // Non-blocking asset check to populate SSL/Domain immediately
+    runAssetCheckForSite(site).catch(err => console.error("Initial asset check failed:", err));
 
     res.status(201).json({ ok: true, item: site });
   } catch (e) {
