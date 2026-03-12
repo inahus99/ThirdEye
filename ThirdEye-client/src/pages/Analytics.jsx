@@ -68,11 +68,12 @@ const BAR_OPTS = {
     },
   },
   scales: {
-    x: { grid: { color: gridColor, drawBorder: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+    x: { grid: { color: gridColor }, border: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
     y: {
       beginAtZero: true, max: 100,
       ticks: { stepSize: 25, font: { size: 10 }, callback: (v) => `${v}%` },
-      grid: { color: gridColor, drawBorder: false },
+      grid: { color: gridColor },
+      border: { display: false },
     },
   },
 };
@@ -95,11 +96,12 @@ const LINE_OPTS = {
     },
   },
   scales: {
-    x: { grid: { color: gridColor, drawBorder: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+    x: { grid: { color: gridColor }, border: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
     y: {
       beginAtZero: true,
       ticks: { font: { size: 10 }, callback: (v) => `${v}ms` },
-      grid: { color: gridColor, drawBorder: false },
+      grid: { color: gridColor },
+      border: { display: false },
     },
   },
 };

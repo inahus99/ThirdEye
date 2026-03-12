@@ -5,7 +5,7 @@ import {
   Button, StatLabel, StatNumber, StatHelpText, Divider, Spinner, Tooltip,
   Switch, IconButton, useToast
 } from "@chakra-ui/react";
-import { DownloadIcon, RepeatIcon, ExternalLinkIcon } from "@chakra-ui/icons";
+import { DownloadIcon, RepeatIcon, ExternalLinkIcon, LockIcon } from "@chakra-ui/icons";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { api, qs } from "../lib/api";
@@ -80,6 +80,7 @@ export default function SiteOverview() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshingSsl, setRefreshingSsl] = useState(false);
 
   const intervalRef = useRef(null);
   const latestIdRef = useRef(siteId);
@@ -237,6 +238,21 @@ export default function SiteOverview() {
     }
   };
 
+  const refreshSslDomain = async () => {
+    if (!siteId) return;
+    setRefreshingSsl(true);
+    try {
+      const res = await api.post(`/websites/${siteId}/refresh-ssl`);
+      const site = res?.item || res;
+      if (site) replaceSiteInList(site);
+      toast({ title: "SSL & domain info refreshed", status: "success", duration: 2500 });
+    } catch (e) {
+      toast({ title: "SSL refresh failed", description: e.message, status: "error" });
+    } finally {
+      setRefreshingSsl(false);
+    }
+  };
+
   // ---- render
   if (loading) return <Spinner mt={6} />;
   if (error) return <Text color="red.300" mt={4}>{error}</Text>;
@@ -366,7 +382,19 @@ export default function SiteOverview() {
       {/* SSL & Domain */}
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={6}>
         <Box bg="surface" border="1px solid" borderColor="border" rounded="xl" p={4}>
-          <Heading size="sm" mb={2}>SSL Certificate</Heading>
+          <HStack justify="space-between" mb={2}>
+            <Heading size="sm">SSL Certificate</Heading>
+            <Tooltip label="Re-check SSL & domain expiry">
+              <IconButton
+                aria-label="Refresh SSL"
+                icon={<LockIcon />}
+                size="xs"
+                variant="ghost"
+                isLoading={refreshingSsl}
+                onClick={refreshSslDomain}
+              />
+            </Tooltip>
+          </HStack>
           <Divider borderColor="border" mb={3} />
           <VStack align="start" spacing={2}>
             <HStack><Text>Valid until:</Text>
@@ -377,14 +405,29 @@ export default function SiteOverview() {
                 {typeof sslDaysLeft === "number" ? plural(sslDaysLeft, "day") : "—"}
               </Badge>
             </HStack>
+            {siteRow.sslCheckedAt && (
+              <Text fontSize="xs" color="muted">Last checked: {fmtDate(siteRow.sslCheckedAt)}</Text>
+            )}
             {siteRow.sslError && <Text color="red.300" fontSize="sm">Note: {siteRow.sslError}</Text>}
           </VStack>
         </Box>
         <Box bg="surface" border="1px solid" borderColor="border" rounded="xl" p={4}>
-          <Heading size="sm" mb={2}>Domain Registration</Heading>
+          <HStack justify="space-between" mb={2}>
+            <Heading size="sm">Domain Registration</Heading>
+            <Tooltip label="Re-check SSL & domain expiry">
+              <IconButton
+                aria-label="Refresh domain"
+                icon={<RepeatIcon />}
+                size="xs"
+                variant="ghost"
+                isLoading={refreshingSsl}
+                onClick={refreshSslDomain}
+              />
+            </Tooltip>
+          </HStack>
           <Divider borderColor="border" mb={3} />
           <VStack align="start" spacing={2}>
-            <HStack><Text>TLD:</Text><Badge variant="subtle">{siteRow.domainTLD || "—"}</Badge></HStack>
+            <HStack><Text>Root domain:</Text><Badge variant="subtle">{siteRow.domainRoot || "—"}</Badge></HStack>
             <HStack><Text>Expires at:</Text>
               <Badge colorScheme={domainBadgeColor} variant="subtle">{fmtDate(siteRow.domainExpiresAt)}</Badge>
             </HStack>
@@ -393,6 +436,9 @@ export default function SiteOverview() {
                 {typeof domainDaysLeft === "number" ? plural(domainDaysLeft, "day") : "—"}
               </Badge>
             </HStack>
+            {siteRow.domainCheckedAt && (
+              <Text fontSize="xs" color="muted">Last checked: {fmtDate(siteRow.domainCheckedAt)}</Text>
+            )}
             {siteRow.domainError && <Text color="red.300" fontSize="sm">Note: {siteRow.domainError}</Text>}
           </VStack>
         </Box>

@@ -83,6 +83,18 @@ router.post("/", async (req, res) => {
   }
 });
 
+// GET a single website
+router.get("/:id", async (req, res) => {
+  try {
+    const site = await Website.findOne({ _id: req.params.id, userId: req.user._id }).lean();
+    if (!site) return res.status(404).json({ ok: false, error: "Site not found or unauthorized" });
+    res.json({ ok: true, item: site });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: "Failed to fetch website" });
+  }
+});
+
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -125,6 +137,22 @@ router.delete("/:id", async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ ok: false, error: "Failed to delete website" });
+  }
+});
+
+// POST /api/websites/:id/refresh-ssl — re-checks SSL cert + domain expiry
+router.post("/:id/refresh-ssl", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const site = await Website.findOne({ _id: id, userId: req.user._id });
+    if (!site) return res.status(404).json({ ok: false, error: "Site not found or unauthorized" });
+
+    await runAssetCheckForSite(site);
+    const fresh = await Website.findOne({ _id: id, userId: req.user._id }).lean();
+    res.json({ ok: true, item: fresh });
+  } catch (e) {
+    console.error("refresh-ssl error:", e);
+    res.status(500).json({ ok: false, error: "refresh_ssl_failed" });
   }
 });
 

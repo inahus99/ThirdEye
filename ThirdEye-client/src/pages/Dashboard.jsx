@@ -106,12 +106,14 @@ const CHART_OPTIONS = {
   },
   scales: {
     x: {
-      grid: { color: "rgba(148,163,184,0.06)", drawBorder: false },
+      grid: { color: "rgba(148,163,184,0.06)" },
+      border: { display: false },
       ticks: { maxTicksLimit: 8, font: { size: 10 } },
     },
     y: {
       beginAtZero: true,
-      grid: { color: "rgba(148,163,184,0.06)", drawBorder: false },
+      grid: { color: "rgba(148,163,184,0.06)" },
+      border: { display: false },
       ticks: { font: { size: 10 }, callback: (v) => `${v}ms` },
     },
   },
