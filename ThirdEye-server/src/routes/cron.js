@@ -24,17 +24,12 @@ router.get("/run-checks", async (req, res) => {
 });
 
 // GET /api/run-daily?apiKey=...
-router.get("/run-daily", async (req, res) => {
+router.get("/run-daily", (req, res) => {
   if (req.query.apiKey !== process.env.CRON_API_KEY) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  try {
-    await runDailyAssetChecks();
-    res.json({ ok: true });
-  } catch (e) {
-    console.error("run-daily error", e);
-    res.status(500).json({ ok: false, error: "server_error" });
-  }
+  res.json({ ok: true, message: "Daily checks started" });
+  runDailyAssetChecks().catch((e) => console.error("run-daily error", e));
 });
 
 // GET /api/debug-asset?url=...

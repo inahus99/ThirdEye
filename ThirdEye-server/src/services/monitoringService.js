@@ -197,10 +197,13 @@ async function runDailyAssetChecks() {
         site.domainDaysLeft = null;
       }
 
-       // Record Check
        site.sslCheckedAt = new Date();
        site.domainCheckedAt = new Date();
-       await site.save();
+       try {
+         await site.save();
+       } catch (e) {
+         console.error("runDailyAssetChecks: save failed for", site._id, e.message);
+       }
      })
    );
  }
