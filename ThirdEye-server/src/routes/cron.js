@@ -29,7 +29,10 @@ router.get("/run-daily", (req, res) => {
     return res.status(401).json({ error: "Unauthorized" });
   }
   res.json({ ok: true, message: "Daily checks started" });
-  runDailyAssetChecks().catch((e) => console.error("run-daily error", e));
+  Promise.all([
+    runAllChecks(),
+    runDailyAssetChecks(),
+  ]).catch((e) => console.error("run-daily error", e));
 });
 
 // GET /api/debug-asset?url=...

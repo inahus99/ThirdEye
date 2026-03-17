@@ -201,6 +201,18 @@ async function runDailyAssetChecks() {
        site.domainCheckedAt = new Date();
        try {
          await site.save();
+         io &&
+           io.emit("site:update", {
+             _id: site._id?.toString?.() || site._id,
+             sslValidTo: site.sslValidTo,
+             sslDaysLeft: site.sslDaysLeft,
+             sslCheckedAt: site.sslCheckedAt,
+             domainExpiresAt: site.domainExpiresAt,
+             domainDaysLeft: site.domainDaysLeft,
+             domainRoot: site.domainRoot,
+             domainSource: site.domainSource,
+             domainCheckedAt: site.domainCheckedAt,
+           });
        } catch (e) {
          console.error("runDailyAssetChecks: save failed for", site._id, e.message);
        }
@@ -238,6 +250,18 @@ async function runDailyAssetChecks() {
    site.sslCheckedAt = new Date();
    site.domainCheckedAt = new Date();
    await site.save();
+   io &&
+     io.emit("site:update", {
+       _id: site._id?.toString?.() || site._id,
+       sslValidTo: site.sslValidTo,
+       sslDaysLeft: site.sslDaysLeft,
+       sslCheckedAt: site.sslCheckedAt,
+       domainExpiresAt: site.domainExpiresAt,
+       domainDaysLeft: site.domainDaysLeft,
+       domainRoot: site.domainRoot,
+       domainSource: site.domainSource,
+       domainCheckedAt: site.domainCheckedAt,
+     });
  }
  
  module.exports = { setIO, pingWebsite, runAllChecks, runDailyAssetChecks, runAssetCheckForSite };
