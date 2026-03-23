@@ -6,6 +6,7 @@ import {
   StatNumber,
 } from "@chakra-ui/react";
 import { RepeatIcon, DownloadIcon } from "@chakra-ui/icons";
+import { FiCheckCircle } from "react-icons/fi";
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 import minMax from "dayjs/plugin/minMax";
@@ -104,7 +105,10 @@ function IncidentTimeline({ rows, days = 7 }) {
     return (
       <Flex align="center" justify="center" h="60px" direction="column" gap={1}>
         <Text fontSize="sm" color="whiteAlpha.400">No incidents in the last 7 days</Text>
-        <Text fontSize="xs" color="green.400">All systems operational ✓</Text>
+        <HStack spacing={1} color="green.400">
+          <FiCheckCircle size="12px" />
+          <Text fontSize="xs">All systems operational</Text>
+        </HStack>
       </Flex>
     );
   }
@@ -382,7 +386,7 @@ export default function Logs() {
               <Bar data={downtimeBarData} options={barOpts} />
             ) : (
               <Flex h="100%" align="center" justify="center" direction="column" gap={1}>
-                <Text fontSize="xl">✅</Text>
+                <Box color="green.400"><FiCheckCircle size="28px" /></Box>
                 <Text fontSize="sm" color="whiteAlpha.400">No downtime in 7 days</Text>
               </Flex>
             )}
