@@ -163,13 +163,13 @@ async function pingWebsite(site) {
 }
 
 async function runAllChecks() {
-  const all = await Website.find();
+  const all = await Website.find({ userId: { $exists: true, $ne: null } });
   await Promise.all(all.map(pingWebsite));
 }
 
-/** Daily SSL + Domain sweep (unchanged) */
+/** Daily SSL + Domain sweep */
 async function runDailyAssetChecks() {
-  const sites = await Website.find();
+  const sites = await Website.find({ userId: { $exists: true, $ne: null } });
   await Promise.all(
     sites.map(async (site) => {
       const host = hostnameFromUrl(site.url);

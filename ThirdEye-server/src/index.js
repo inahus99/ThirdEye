@@ -14,7 +14,8 @@ require("./models/Check");
 require("./models/Incident");
 
 const connectDB = require("./db");
-const { setIO } = require("./services/monitoringService");
+const { setIO, runAllChecks, runDailyAssetChecks } = require("./services/monitoringService");
+const cron = require("node-cron");
 
 const analyticsRouter = require("./routes/analytics");
 const websitesRouter = require("./routes/websites");
@@ -103,8 +104,19 @@ process.on("uncaughtException",  (e) => console.error("UNCAUGHT EXCEPTION",  e))
   try {
     await connectDB();
     console.log("Mongo connected");
+
+    // Every 15 minutes: HTTP/TCP uptime checks
+    cron.schedule("*/15 * * * *", () => {
+      runAllChecks().catch((e) => console.error("cron run-checks error", e));
+    });
+
+    // Once daily at 02:00: SSL cert + domain expiry checks
+    cron.schedule("0 2 * * *", () => {
+      runDailyAssetChecks().catch((e) => console.error("cron run-daily error", e));
+    });
+
+    console.log("Cron jobs scheduled: checks every 15 min, daily assets at 02:00");
   } catch (e) {
     console.error("Mongo connect failed:", e.message);
- 
   }
 })();
